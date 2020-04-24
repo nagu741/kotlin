@@ -118,7 +118,7 @@ class AnonymousObjectTransformer(
         // The result is effectively the same anyway.
         val debugInfoToParse = debugInfo.takeIf { !inliningContext.isInliningLambda }
         sourceMap = SMAPParser.parseOrCreateDefault(debugInfoToParse, sourceInfo, oldObjectType.internalName, 1, 65535)
-        sourceMapper = SourceMapper(sourceMap.sourceInfo.takeIf { debugInfoToParse?.isEmpty() == false })
+        sourceMapper = SourceMapper(sourceMap.fileMappings.firstOrNull { it.name == sourceInfo }?.toSourceInfo())
 
         val allCapturedParamBuilder = ParametersBuilder.newBuilder()
         val constructorParamBuilder = ParametersBuilder.newBuilder()
