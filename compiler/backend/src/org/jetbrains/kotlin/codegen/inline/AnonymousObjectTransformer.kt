@@ -117,7 +117,8 @@ class AnonymousObjectTransformer(
         // When regenerating objects in lambdas, keep the old SMAP and don't remap the line numbers to save time.
         // The result is effectively the same anyway.
         val debugInfoToParse = debugInfo.takeIf { !inliningContext.isInliningLambda }
-        sourceMap = SMAPParser.parseOrCreateDefault(debugInfoToParse, sourceInfo, oldObjectType.internalName, 1, 65535)
+        val (firstLine, lastLine) = methodsToTransform.lineNumberRange()
+        sourceMap = SMAPParser.parseOrCreateDefault(debugInfoToParse, sourceInfo, oldObjectType.internalName, firstLine, lastLine)
         sourceMapper = SourceMapper(sourceMap.fileMappings.firstOrNull { it.name == sourceInfo }?.toSourceInfo())
 
         val allCapturedParamBuilder = ParametersBuilder.newBuilder()
