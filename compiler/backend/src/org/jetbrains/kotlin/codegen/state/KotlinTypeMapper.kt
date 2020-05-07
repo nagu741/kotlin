@@ -653,11 +653,16 @@ class KotlinTypeMapper @JvmOverloads constructor(
             }
         }
 
-        val suffix = getManglingSuffixBasedOnParameterTypes(descriptor)
-        if (suffix != null) {
-            newName += suffix
-        } else if (kind === OwnerKind.ERASED_INLINE_CLASS) {
-            newName += JvmAbi.IMPL_SUFFIX_FOR_INLINE_CLASS_MEMBERS
+        // Skip inline class mangling for property reference signatures,
+        // so that we don't have to repeat the same logic in reflection
+        // in case of properties without getter methods.
+        if (kind !== OwnerKind.PROPERTY_REFERENCE_SIGNATURE || descriptor.isPropertyWithGetterSignaturePresent()) {
+            val suffix = getManglingSuffixBasedOnParameterTypes(descriptor)
+            if (suffix != null) {
+                newName += suffix
+            } else if (kind === OwnerKind.ERASED_INLINE_CLASS) {
+                newName += JvmAbi.IMPL_SUFFIX_FOR_INLINE_CLASS_MEMBERS
+            }
         }
 
         newName = sanitizeNameIfNeeded(newName, languageVersionSettings)
@@ -678,12 +683,25 @@ class KotlinTypeMapper @JvmOverloads constructor(
         } else newName
     }
 
+    private fun CallableMemberDescriptor.isPropertyWithGetterSignaturePresent(): Boolean {
+        val propertyDescriptor = when (this) {
+            is PropertyDescriptor -> this
+            is PropertyAccessorDescriptor -> correspondingProperty
+            else -> return false
+        }
+        return PropertyCodegen.isReferenceablePropertyWithGetter(propertyDescriptor)
+    }
+
     private fun getModuleName(descriptor: CallableMemberDescriptor): String {
         return getJvmModuleNameForDeserializedDescriptor(descriptor) ?: moduleName
     }
 
     fun mapAsmMethod(descriptor: FunctionDescriptor): Method {
         return mapSignature(descriptor).asmMethod
+    }
+
+    fun mapPropertyReferenceSignature(descriptor: FunctionDescriptor): Method {
+        return mapSignature(descriptor, OwnerKind.PROPERTY_REFERENCE_SIGNATURE, true).asmMethod
     }
 
     fun mapAsmMethod(descriptor: FunctionDescriptor, kind: OwnerKind): Method {

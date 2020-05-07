@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.resolve.InlineClassDescriptorResolver
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameUnsafe
 import org.jetbrains.kotlin.resolve.isInlineClassType
-import org.jetbrains.kotlin.resolve.jvm.*
+import org.jetbrains.kotlin.resolve.jvm.requiresFunctionNameMangling
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.typeUtil.representativeUpperBound
 import java.security.MessageDigest
@@ -31,7 +31,7 @@ fun getManglingSuffixBasedOnParameterTypes(descriptor: CallableMemberDescriptor)
     // NB here function can be a suspend function JVM view with return type replaced with 'Any',
     // should unwrap it and take original return type instead.
     val returnType = descriptor.unwrapInitialDescriptorForSuspendFunction().returnType!!
-    if (descriptor.containingDeclaration is ClassDescriptor && returnType.isInlineClassType()) {
+    if (returnType.isInlineClassType() && descriptor.containingDeclaration is ClassDescriptor) {
         return "-" + md5base64(":" + getSignatureElementForMangling(returnType))
     }
 
