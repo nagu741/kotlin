@@ -17,7 +17,7 @@ class A : S {
     constructor() : super(
             foo(),
             Nested(),
-            Inner(),
+            <!UNRESOLVED_REFERENCE!>Inner<!>(),
             CONST,
             Companion.CONST,
             Nested.CONST,

@@ -31,7 +31,7 @@ class A(
         foo(),
         Nested(),
         inn,
-        Inner(),
+        <!UNRESOLVED_REFERENCE!>Inner<!>(),
         i,
         CONST,
         Companion.CONST,

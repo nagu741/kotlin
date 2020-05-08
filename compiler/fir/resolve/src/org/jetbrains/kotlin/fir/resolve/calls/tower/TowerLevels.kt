@@ -259,7 +259,7 @@ class ScopeTowerLevel(
                 name,
                 session,
                 bodyResolveComponents,
-                includeInnerConstructors = includeInnerConstructors
+                includeInnerConstructors
             ) { candidate ->
                 empty = false
                 if (candidate.hasConsistentReceivers(extensionReceiver)) {

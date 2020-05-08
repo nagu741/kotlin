@@ -59,7 +59,7 @@ class Y: B() {
         val b_s: B_S = null!!
 
         init {
-            B_()
+            <!UNRESOLVED_REFERENCE!>B_<!>()
             B_S()
         }
     }
@@ -83,7 +83,7 @@ class Z: C() {
 
         init {
             A_S()
-            B_()
+            <!UNRESOLVED_REFERENCE!>B_<!>()
             B_S()
         }
     }

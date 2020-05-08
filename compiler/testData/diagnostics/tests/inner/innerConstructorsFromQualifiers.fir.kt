@@ -10,8 +10,8 @@ class Outer {
     companion object {
 
         fun baz() {
-            Inner()
-            Inner(1)
+            <!UNRESOLVED_REFERENCE!>Inner<!>()
+            <!UNRESOLVED_REFERENCE!>Inner<!>(1)
         }
     }
 }
@@ -26,8 +26,8 @@ import abc.Outer
 import abc.Outer.Inner
 
 fun bar() {
-    Inner()
-    Inner(1)
+    <!UNRESOLVED_REFERENCE!>Inner<!>()
+    <!UNRESOLVED_REFERENCE!>Inner<!>(1)
 
     with(Outer()) {
         Inner()
