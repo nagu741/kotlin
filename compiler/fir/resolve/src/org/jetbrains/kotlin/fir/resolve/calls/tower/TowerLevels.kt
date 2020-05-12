@@ -183,7 +183,7 @@ class MemberScopeTowerLevel(
     }
 }
 
-// This is more like "scope-based tower level"
+// This is more like "scope-based tower level" related to "lexical" or "non-member" scope
 // We can access here members of currently accessible scope which is not influenced by explicit receiver
 // We can either have no explicit receiver at all, or it can be an extension receiver
 // An explicit receiver never can be a dispatch receiver at this level
@@ -285,6 +285,7 @@ class ScopeTowerLevel(
     }
 }
 
+// Very special kind of tower level for *declared* non-inner (static) constructor resolve
 class ConstructorScopeTowerLevel(
     session: FirSession,
     val scope: FirScope
