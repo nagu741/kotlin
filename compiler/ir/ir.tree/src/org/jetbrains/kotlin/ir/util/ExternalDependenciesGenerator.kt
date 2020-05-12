@@ -18,9 +18,11 @@ package org.jetbrains.kotlin.ir.util
 
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
+import org.jetbrains.kotlin.builtins.functions.FunctionClassDescriptor
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.descriptors.IrBuiltIns
+import org.jetbrains.kotlin.ir.descriptors.WrappedDeclarationDescriptor
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.utils.addToStdlib.firstNotNullResult
 
@@ -40,8 +42,10 @@ class ExternalDependenciesGenerator(
         /*
             Deserializing a reference may lead to new unbound references, so we loop until none are left.
          */
-        lateinit var unbound: List<IrSymbol>
+        var unbound = setOf<IrSymbol>()
+        lateinit var prevUnbound: Set<IrSymbol>
         do {
+            prevUnbound = unbound
             unbound = symbolTable.allUnbound
 
             for (symbol in unbound) {
@@ -49,15 +53,16 @@ class ExternalDependenciesGenerator(
                 if (!symbol.isBound) {
                     irProviders.getDeclaration(symbol)
                 }
-                assert(symbol.isBound) { "$symbol unbound even after deserialization attempt" }
+                //assert(symbol.isBound) { "$symbol unbound even after deserialization attempt" }
             }
-        } while (unbound.isNotEmpty())
+        // We wait for the unbound to stabilize on fake overrides.
+        } while (/*unbound.isNotEmpty()*/unbound != prevUnbound)
     }
 }
 
-private val SymbolTable.allUnbound: List<IrSymbol>
+private val SymbolTable.allUnbound: Set<IrSymbol>
     get() {
-        val r = mutableListOf<IrSymbol>()
+        val r = mutableSetOf<IrSymbol>()
         r.addAll(unboundClasses)
         r.addAll(unboundConstructors)
         r.addAll(unboundEnumEntries)
@@ -68,10 +73,20 @@ private val SymbolTable.allUnbound: List<IrSymbol>
         return r
     }
 
-fun List<IrProvider>.getDeclaration(symbol: IrSymbol): IrDeclaration =
+fun SymbolTable.noUnboundLeft(message: String) {
+    val unbound = this.allUnbound
+    assert(unbound.isEmpty()) {
+        "$message\n" +
+                unbound.map {
+                    "$it ${if (it.isPublicApi) it.signature.toString() else "NON-PUBLIC API $it"}"
+                }.joinToString("\n")
+    }
+}
+
+fun List<IrProvider>.getDeclaration(symbol: IrSymbol): IrDeclaration? =
     firstNotNullResult { provider ->
         provider.getDeclaration(symbol)
-    } ?: error("Could not find declaration for unbound symbol $symbol")
+    } //?: error("Could not find declaration for unbound symbol $symbol")
 
 // In most cases, IrProviders list consist of an optional deserializer and a DeclarationStubGenerator.
 fun generateTypicalIrProviderList(
