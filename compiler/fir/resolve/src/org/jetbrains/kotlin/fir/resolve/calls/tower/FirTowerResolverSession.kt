@@ -15,15 +15,11 @@ import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.builder.FirQualifiedAccessExpressionBuilder
 import org.jetbrains.kotlin.fir.references.FirSuperReference
-import org.jetbrains.kotlin.fir.resolve.BodyResolveComponents
-import org.jetbrains.kotlin.fir.resolve.buildResolvedQualifierForClass
+import org.jetbrains.kotlin.fir.resolve.*
 import org.jetbrains.kotlin.fir.resolve.calls.*
-import org.jetbrains.kotlin.fir.resolve.scope
-import org.jetbrains.kotlin.fir.resolve.transformQualifiedAccessUsingSmartcastInfo
 import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.firUnsafe
 import org.jetbrains.kotlin.fir.scopes.FirScope
 import org.jetbrains.kotlin.fir.scopes.ProcessorAction
-import org.jetbrains.kotlin.fir.scopes.impl.FirCompositeScope
 import org.jetbrains.kotlin.fir.scopes.impl.FirLocalScope
 import org.jetbrains.kotlin.fir.scopes.impl.FirStaticScope
 import org.jetbrains.kotlin.fir.scopes.unsubstitutedScope
@@ -127,10 +123,9 @@ class FirTowerResolverSession internal constructor(
     private fun FirScope.toScopeTowerLevel(
         extensionReceiver: ReceiverValue? = null,
         extensionsOnly: Boolean = false,
-        includeInnerConstructors: Boolean = false
     ): ScopeTowerLevel = ScopeTowerLevel(
         session, components, this,
-        extensionReceiver, extensionsOnly, includeInnerConstructors
+        extensionReceiver, extensionsOnly
     )
 
     private fun FirScope.toConstructorScopeTowerLevel(): ConstructorScopeTowerLevel =
@@ -144,6 +139,12 @@ class FirTowerResolverSession internal constructor(
         extensionReceiver, implicitExtensionInvokeMode,
         scopeSession = components.scopeSession
     )
+
+    private fun ConeKotlinType.toMemberScopeTowerLevel(): MemberScopeTowerLevel? {
+        val symbol = (this as? ConeClassLikeType)?.fullyExpandedType(session)?.lookupTag?.toSymbol(session) as? FirClassSymbol
+            ?: return null
+        return ImplicitDispatchReceiverValue(symbol, this, session, components.scopeSession).toMemberScopeTowerLevel()
+    }
 
     private suspend fun processQualifierScopes(
         info: CallInfo, qualifierReceiver: QualifierReceiver?
@@ -501,17 +502,23 @@ class FirTowerResolverSession internal constructor(
         info: CallInfo,
         superTypeRef: FirTypeRef
     ) {
-        val scope = when (superTypeRef) {
-            is FirResolvedTypeRef -> superTypeRef.type.scope(session, components.scopeSession)
-            is FirComposedSuperTypeRef -> FirCompositeScope(
-                superTypeRef.superTypeRefs.mapNotNullTo(mutableListOf()) { it.type.scope(session, components.scopeSession) }
-            )
-            else -> null
-        } ?: return
-        processLevel(
-            scope.toScopeTowerLevel(includeInnerConstructors = true),
-            info, TowerGroup.Member, explicitReceiverKind = ExplicitReceiverKind.DISPATCH_RECEIVER
-        )
+        when (superTypeRef) {
+            is FirResolvedTypeRef -> {
+                processLevel(
+                    superTypeRef.type.toMemberScopeTowerLevel() ?: return,
+                    info, TowerGroup.Member, explicitReceiverKind = ExplicitReceiverKind.DISPATCH_RECEIVER
+                )
+            }
+            is FirComposedSuperTypeRef -> {
+                for (typeRef in superTypeRef.superTypeRefs) {
+                    processLevel(
+                        typeRef.type.toMemberScopeTowerLevel() ?: continue,
+                        info, TowerGroup.Member, explicitReceiverKind = ExplicitReceiverKind.DISPATCH_RECEIVER
+                    )
+                }
+            }
+            else -> return
+        }
     }
 
     private suspend fun runResolverForInvoke(
