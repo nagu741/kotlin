@@ -280,3 +280,28 @@ private fun isRunMutedTestsPropertyEnabled(): Boolean = System.getProperty("kotl
 fun TestCase.runTest(test: () -> Unit) {
     (wrapWithMuteInDatabase(this, test) ?: test).invoke()
 }
+
+@Throws(Exception::class)
+fun testWithMuteInDatabase(test: KotlinTestUtils.DoTest, testCase: TestCase): KotlinTestUtils.DoTest {
+    val extraSuffix = testCase.javaClass.getAnnotation(MuteExtraSuffix::class.java)?.value ?: ""
+    return testWithMuteInDatabase(test, extraSuffix)
+}
+
+@Throws(Exception::class)
+fun testWithMuteInDatabase(test: KotlinTestUtils.DoTest, extraSuffix: String): KotlinTestUtils.DoTest {
+    return object : KotlinTestUtils.DoTest {
+        override fun invoke(filePath: String) {
+            if (isRunMutedTestsPropertyEnabled()) {
+                try {
+                    test.invoke(filePath)
+                } catch (e: Throwable) {
+                    return
+                }
+                System.err.println("SUCCESS RESULT OF MUTED TEST: $filePath")
+                throw Exception("Muted non-flaky test finished successfully. Please remove it from ")
+            } else {
+                testWithMuteInFile(test, extraSuffix).invoke(filePath)
+            }
+        }
+    }
+}
