@@ -1649,6 +1649,11 @@ public class FirDiagnosticsWithLightTreeTestGenerated extends AbstractFirDiagnos
             runTest("compiler/fir/analysis-tests/testData/resolve/problems/innerClassHierarchy.kt");
         }
 
+        @TestMetadata("innerClassTypeAliasConstructor.kt")
+        public void testInnerClassTypeAliasConstructor() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/problems/innerClassTypeAliasConstructor.kt");
+        }
+
         @TestMetadata("javaAccessorConversion.kt")
         public void testJavaAccessorConversion() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/problems/javaAccessorConversion.kt");
