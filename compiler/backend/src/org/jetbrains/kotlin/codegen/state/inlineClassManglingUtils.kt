@@ -30,9 +30,11 @@ fun getManglingSuffixBasedOnParameterTypes(descriptor: CallableMemberDescriptor)
     // If a class member function returns inline class value, mangle its name.
     // NB here function can be a suspend function JVM view with return type replaced with 'Any',
     // should unwrap it and take original return type instead.
-    val returnType = descriptor.unwrapInitialDescriptorForSuspendFunction().returnType!!
-    if (returnType.isInlineClassType() && descriptor.containingDeclaration is ClassDescriptor) {
-        return "-" + md5base64(":" + getSignatureElementForMangling(returnType))
+    if (descriptor.containingDeclaration is ClassDescriptor) {
+        val returnType = descriptor.unwrapInitialDescriptorForSuspendFunction().returnType!!
+        if (requiresFunctionNameMangling(listOf(returnType))) {
+            return "-" + md5base64(":" + getSignatureElementForMangling(returnType))
+        }
     }
 
     return null
