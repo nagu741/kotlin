@@ -13,8 +13,8 @@ FILE: innerClassTypeAliasConstructor.kt
 
     }
     public final typealias Alias = R|Outer.Inner|
-    public final fun R|Outer|.test(): R|Outer.Inner| {
-        ^test R|/Outer.Inner.Inner|()
+    public final fun R|Outer|.test(): <ERROR TYPE REF: Unresolved name: Alias> {
+        ^test <Unresolved name: Alias>#()
     }
     public final fun R|Outer|.test2(): <ERROR TYPE REF: Unresolved name: Inner> {
         ^test2 Q|Outer|.<Unresolved name: Inner>#()
