@@ -3,16 +3,14 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
-package org.jetbrains.kotlin.backend.common.serialization
+package org.jetbrains.kotlin.ir.util
 
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.symbols.IrBindableSymbol
-import org.jetbrains.kotlin.ir.util.isReal
-import org.jetbrains.kotlin.ir.util.original
-import org.jetbrains.kotlin.ir.util.render
-import org.jetbrains.kotlin.ir.util.resolveFakeOverride
-
+import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.utils.addToStdlib.safeAs
+/*
 // We may get several real supers here (e.g. see the code snippet from KT-33034).
 // TODO: Consider reworking the resolution algorithm to get a determined super declaration.
 private fun <S: IrBindableSymbol<*, D>, D: IrOverridableDeclaration<S>> D.getRealSupers(): Set<D> {
@@ -52,6 +50,7 @@ private fun <S: IrBindableSymbol<*, D>, D: IrOverridableDeclaration<S>> D.getRea
 
     return realSupers
 }
+*/
 /*
 /**
  * Implementation of given method.
@@ -79,4 +78,55 @@ val IrFunction.target: IrFunction get() = when (this) {
     is IrSimpleFunction -> this.target
     is IrConstructor -> this
     else -> error(this)
+}
+
+fun IrSimpleFunction.collectRealOverrides(toSkip: (IrSimpleFunction) -> Boolean = { false }): Set<IrSimpleFunction> {
+    if (isReal && !toSkip(this)) return setOf(this)
+
+    val visited = mutableSetOf<IrSimpleFunction>()
+    val realOverrides = mutableSetOf<IrSimpleFunction>()
+
+    fun collectRealOverrides(func: IrSimpleFunction) {
+        if (!visited.add(func)) return
+
+        if (func.isReal && !toSkip(func)) {
+            realOverrides += func
+        } else {
+            func.overriddenSymbols.forEach { collectRealOverrides(it.owner) }
+        }
+    }
+
+    overriddenSymbols.forEach { collectRealOverrides(it.owner) }
+
+    fun excludeRepeated(func: IrSimpleFunction) {
+        if (!visited.add(func)) return
+
+        func.overriddenSymbols.forEach {
+            realOverrides.remove(it.owner)
+            excludeRepeated(it.owner)
+        }
+    }
+
+    visited.clear()
+    realOverrides.toList().forEach { excludeRepeated(it) }
+
+    return realOverrides
+}
+
+// TODO: use this implementation instead of any other
+fun IrSimpleFunction.resolveFakeOverride(toSkip: (IrSimpleFunction) -> Boolean = { false }, allowAbstract: Boolean = false): IrSimpleFunction? {
+    val reals = collectRealOverrides(toSkip)
+    return if (allowAbstract) {
+        if (reals.isEmpty()) error("No real overrides for ${this.render()}")
+        reals.first()
+    } else {
+        reals
+            .filter { it.modality != Modality.ABSTRACT }
+            .let { realOverrides ->
+                // Kotlin forbids conflicts between overrides, but they may trickle down from Java.
+                realOverrides.singleOrNull { it.parent.safeAs<IrClass>()?.isInterface != true }
+                // TODO: We take firstOrNull instead of singleOrNull here because of KT-36188.
+                    ?: realOverrides.firstOrNull()
+            }
+    }
 }
