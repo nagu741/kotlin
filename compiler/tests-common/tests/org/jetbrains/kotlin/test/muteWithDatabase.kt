@@ -21,6 +21,8 @@ private class AutoMute(
     val issue: String
 )
 
+private val RUN_MUTED_TESTS = java.lang.Boolean.getBoolean("kotlin.tests.muted.run")
+
 private val DO_AUTO_MUTE: AutoMute? by lazy {
     val autoMuteFile = File("tests/automute")
     if (autoMuteFile.exists()) {
@@ -161,16 +163,13 @@ internal fun isMuted(testCase: TestCase): Boolean {
 
 fun isMuted(testClass: Class<*>, methodKey: String): Boolean {
     val mutedTest = mutedSet.mutedTest(testClass, methodKey)
-    val isMuted = mutedTest != null && !mutedTest.hasFailFile
-    val isFlaky = mutedTest != null && mutedTest.isFlaky
-    return shouldBeMuted(isMuted, isFlaky)
+    val isMutedInDatabase = mutedTest != null && !mutedTest.hasFailFile
+    return if (RUN_MUTED_TESTS) !isMutedInDatabase else isMutedInDatabase
 }
 
-fun shouldBeMuted(isMuted: Boolean, isFlaky: Boolean): Boolean {
-    if (isRunMutedTestsPropertyEnabled())
-        return !isMuted || isFlaky
-    else
-        return isMuted
+private fun isFlaky(testCase: TestCase): Boolean {
+    val mutedTest = mutedSet.mutedTest(testCase.javaClass, testCase.name)
+    return mutedTest != null && mutedTest.isFlaky
 }
 
 internal fun wrapWithMuteInDatabase(testCase: TestCase, f: () -> Unit): (() -> Unit)? {
@@ -275,32 +274,35 @@ fun isIgnoredInDatabaseWithLog(testCase: TestCase): Boolean {
     return false
 }
 
-private fun isRunMutedTestsPropertyEnabled(): Boolean = System.getProperty("kotlin.tests.muted.run") == "true"
-
 fun TestCase.runTest(test: () -> Unit) {
     (wrapWithMuteInDatabase(this, test) ?: test).invoke()
 }
 
 @Throws(Exception::class)
 fun testWithMuteInDatabase(test: KotlinTestUtils.DoTest, testCase: TestCase): KotlinTestUtils.DoTest {
-    val extraSuffix = testCase.javaClass.getAnnotation(MuteExtraSuffix::class.java)?.value ?: ""
-    return testWithMuteInDatabase(test, extraSuffix)
-}
-
-@Throws(Exception::class)
-fun testWithMuteInDatabase(test: KotlinTestUtils.DoTest, extraSuffix: String): KotlinTestUtils.DoTest {
     return object : KotlinTestUtils.DoTest {
         override fun invoke(filePath: String) {
-            if (isRunMutedTestsPropertyEnabled()) {
-                try {
-                    test.invoke(filePath)
-                } catch (e: Throwable) {
-                    return
+            if (RUN_MUTED_TESTS) {
+                if (isFlaky(testCase)) {
+                    try {
+                        test.invoke(filePath)
+                        println("MUTED FLAKY TEST succeed: $testCase")
+                    } catch (e: Throwable) {
+                        System.err.println("MUTED FLAKY TEST fails: $testCase")
+                        throw e
+                    }
+                } else {
+                    try {
+                        test.invoke(filePath)
+                    } catch (e: Throwable) {
+                        println("MUTED TEST STILL FAILS: $testCase")
+                        return
+                    }
+                    System.err.println("SUCCESS RESULT OF MUTED TEST: $testCase")
+                    throw Exception("Muted non-flaky test $testCase finished successfully. Please remove it from csv file")
                 }
-                System.err.println("SUCCESS RESULT OF MUTED TEST: $filePath")
-                throw Exception("Muted non-flaky test finished successfully. Please remove it from ")
             } else {
-                testWithMuteInFile(test, extraSuffix).invoke(filePath)
+                testWithMuteInFile(test, testCase).invoke(filePath)
             }
         }
     }

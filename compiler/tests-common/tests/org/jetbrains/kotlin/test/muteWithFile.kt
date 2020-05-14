@@ -17,6 +17,12 @@ private val AUTOMATICALLY_GENERATE_FAIL_FILE_FOR_FAILED_TESTS: Boolean = false
 annotation class MuteExtraSuffix(val value: String = "")
 
 @Throws(Exception::class)
+fun testWithMuteInFile(test: DoTest, testCase: TestCase): DoTest {
+    val extraSuffix = testCase.javaClass.getAnnotation(MuteExtraSuffix::class.java)?.value ?: ""
+    return testWithMuteInFile(test, extraSuffix)
+}
+
+@Throws(Exception::class)
 fun testWithMuteInFile(test: DoTest, extraSuffix: String): DoTest {
     return object : DoTest {
         override fun invoke(filePath: String) {
